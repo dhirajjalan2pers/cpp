@@ -1,0 +1,4 @@
+interface:
+  display_name: "CRO Fit Score"
+  short_description: "Score job fit with the active coding agent"
+  default_prompt: "Use $cro-fit-score to score my unscored jobs against my current resume."

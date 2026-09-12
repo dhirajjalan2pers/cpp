@@ -1,0 +1,4 @@
+interface:
+  display_name: "Read-only WhatsApp CCO"
+  short_description: "Summarize WhatsApp context without sending"
+  default_prompt: "Use $cco-whatsapp to summarize recent WhatsApp context and suggest follow-ups."

@@ -1,0 +1,6 @@
+[project]
+name = "ujb-whatsapp-readonly-mcp"
+version = "1.0.0"
+description = "Read-only WhatsApp search and context MCP"
+requires-python = ">=3.11"
+dependencies = ["mcp[cli]>=1.6.0,<2", "psycopg[binary]>=3.2,<4"]

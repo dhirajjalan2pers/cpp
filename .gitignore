@@ -1,0 +1,17 @@
+.env
+.env.local
+.env.*.local
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+.next/
+dist/
+*.log
+*.pdf
+*.db
+*.db-wal
+*.db-shm
+whatsapp/bridge/store/
+coverage/
+.DS_Store

@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ujb
+      POSTGRES_USER: ujb
+      POSTGRES_PASSWORD: ujb
+    ports:
+      - "5432:5432"
+    volumes:
+      - ujb-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ujb -d ujb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  ujb-postgres:
+

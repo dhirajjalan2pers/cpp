@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "LBS CPP → Universal Jobs Board",
+  "version": "1.0.0",
+  "description": "Securely syncs your LBS Career Portal Plus session to your personal jobs board.",
+  "permissions": ["cookies", "storage", "tabs"],
+  "host_permissions": ["https://lbs.12twenty.com/*"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_popup": "popup.html", "default_title": "CPP session sync" },
+  "options_page": "options.html"
+}
+

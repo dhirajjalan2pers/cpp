@@ -1,0 +1,37 @@
+{
+  "name": "lbs-personal-ujb",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build --webpack",
+    "start": "next start",
+    "migrate": "tsx scripts/migrate.ts",
+    "doctor": "tsx scripts/doctor.ts",
+    "fit": "tsx scripts/fit-score.ts",
+    "whatsapp:sync": "uv --directory ../whatsapp/mcp run sync_postgres.py",
+    "audit:whatsapp": "tsx scripts/audit-whatsapp.ts",
+    "test": "vitest run && node --test ../extension/tests/*.test.mjs && python3 -m unittest discover -s ../whatsapp/mcp -p 'test_*.py' && npm run audit:whatsapp"
+  },
+  "dependencies": {
+    "dotenv": "17.2.3",
+    "next": "16.3.0",
+    "pg": "8.16.3",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "25.2.3",
+    "@types/pg": "8.16.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  },
+  "overrides": {
+    "esbuild": "0.28.1"
+  }
+}

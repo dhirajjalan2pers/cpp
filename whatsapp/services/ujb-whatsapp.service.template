@@ -1,0 +1,14 @@
+[Unit]
+Description=Read-only UJB WhatsApp bridge
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=REPLACE_WITH_ABSOLUTE_STARTER_PATH/whatsapp/bridge
+ExecStart=/usr/bin/go run .
+Restart=on-failure
+UMask=0077
+
+[Install]
+WantedBy=default.target
+
