@@ -44,7 +44,6 @@ export default function JobsDashboard() {
   const [search, setSearch] = useState(""); const [contract, setContract] = useState(""); const [method, setMethod] = useState(""); const [location, setLocation] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [starredOnly, setStarredOnly] = useState(false); const [showApplied, setShowApplied] = useState(false);
-  const [newIds, setNewIds] = useState<Set<string>>(new Set());
   const [triage, setTriage] = useState(true); const [sort, setSort] = useState<{ k: SortKey; d: 1 | -1 }>({ k: "fit", d: -1 });
   const [editing, setEditing] = useState<Job | "new" | null>(null); const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -52,32 +51,19 @@ export default function JobsDashboard() {
     setLoading(true);
     const r = await fetch("/api/cpp/jobs", { cache: "no-store" });
     const b = await r.json();
-    if (r.ok) {
-      setJobs(b.jobs); setSession(b.session);
-      try {
-        const ids = (b.jobs as Job[]).map((j) => `${j.source}:${j.id}`);
-        if (localStorage.getItem("ujb_seen_ids") === null) localStorage.setItem("ujb_seen_ids", JSON.stringify(ids));
-        const rawNew = localStorage.getItem("ujb_new_ids");
-        if (rawNew) { const s = new Set<string>(JSON.parse(rawNew)); setNewIds(new Set(ids.filter((id) => s.has(id)))); }
-      } catch { /* storage unavailable */ }
-    } else setMessage(b.error);
+    if (r.ok) { setJobs(b.jobs); setSession(b.session); } else setMessage(b.error);
     setLoading(false);
     return r.ok ? (b.jobs as Job[]) : [];
   }, []);
   useEffect(() => { void load(); }, [load]);
   async function refresh() {
     setRefreshing(true); setMessage("");
-    let prevSeen = new Set<string>();
-    try { const raw = localStorage.getItem("ujb_seen_ids"); if (raw) prevSeen = new Set(JSON.parse(raw)); } catch { /* ignore */ }
     const r = await fetch("/api/cpp/jobs/refresh", { method: "POST" });
     const b = await r.json();
     if (r.ok) {
       const list = await load();
-      const ids = list.map((j) => `${j.source}:${j.id}`);
-      const fresh = ids.filter((id) => !prevSeen.has(id));
-      setNewIds(new Set(fresh));
-      try { localStorage.setItem("ujb_new_ids", JSON.stringify(fresh)); localStorage.setItem("ujb_seen_ids", JSON.stringify(ids)); } catch { /* ignore */ }
-      setMessage(`Refreshed ${b.refreshed} active CPP jobs${fresh.length ? ` · ${fresh.length} new` : ""}.`);
+      const n = list.filter((j) => j.isNew).length; // server-derived: arrived in this refresh
+      setMessage(`Refreshed ${b.refreshed} active CPP jobs${n ? ` · ${n} new` : ""}.`);
     } else setMessage(b.error);
     setRefreshing(false);
   }
@@ -166,7 +152,7 @@ export default function JobsDashboard() {
               <td className="col-star" onClick={(e) => { e.stopPropagation(); void setState(job, "starred"); }}><span className={`star ${job.starred ? "on" : ""}`}>{job.starred ? "★" : "☆"}</span></td>
               <td><span className={`fit ${tier}`}>{job.fitScore == null ? "—" : (job.fitScore / 10).toFixed(1)}{job.fitStale && <span className="stale" title="Score stale" />}</span></td>
               <td>{job.applied ? <span style={{ color: "var(--success)", fontWeight: 600 }}>Yes</span> : <span className="muted">No</span>}</td>
-              <td className="t-title">{newIds.has(key) && <span className="new-badge">NEW</span>}{job.url ? <a href={job.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{job.title}</a> : <span className="mock">{job.title}</span>}{job.source === "manual" && <span className="src">MANUAL</span>}{!job.active && <span className="src">INACTIVE</span>}</td>
+              <td className="t-title">{job.isNew && <span className="new-badge">NEW</span>}{job.url ? <a href={job.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{job.title}</a> : <span className="mock">{job.title}</span>}{job.source === "manual" && <span className="src">MANUAL</span>}{!job.active && <span className="src">INACTIVE</span>}</td>
               <td className="t-co">{job.companyName}</td>
               <td>{job.industry ? <span className="pill">{job.industry}</span> : <span className="muted">—</span>}</td>
               <td>{methods.length ? methods.map((m) => m.toUpperCase() === "CPP" ? <span key={m} className="pill">CPP</span> : <span key={m} className="muted">{m}</span>) : <span className="muted">—</span>}</td>

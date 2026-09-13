@@ -16,6 +16,7 @@ export interface Job {
   postedAt: string | null;
   applicantCount: number;
   active: boolean;
+  isNew: boolean;
   notes?: string;
   starred: boolean;
   archived: boolean;

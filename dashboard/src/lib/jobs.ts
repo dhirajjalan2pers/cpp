@@ -18,6 +18,7 @@ interface JobRow {
   posted_at: Date | null;
   applicant_count: number;
   active: boolean;
+  is_new: boolean;
   notes: string | null;
   starred: boolean | null;
   archived: boolean | null;
@@ -34,12 +35,12 @@ export async function listJobs(): Promise<Job[]> {
     WITH all_jobs AS (
       SELECT id, 'cpp'::text source, title, company_name, industry, location,
         contract_type, application_method, is_paid, url, description, deadline,
-        posted_at, applicant_count, active, NULL::text notes
+        posted_at, applicant_count, active, (active AND first_seen_at = last_seen_at) is_new, NULL::text notes
       FROM cpp_jobs
       UNION ALL
       SELECT id::text, 'manual'::text, title, company_name, industry, location,
         contract_type, application_method, is_paid, url, description, deadline,
-        created_at, 0, TRUE, notes
+        created_at, 0, TRUE, FALSE, notes
       FROM manual_jobs
     ), resume AS (
       SELECT content_sha256 FROM documents WHERE kind = 'resume' LIMIT 1
@@ -67,6 +68,7 @@ export async function listJobs(): Promise<Job[]> {
     postedAt: row.posted_at?.toISOString() ?? null,
     applicantCount: row.applicant_count,
     active: row.active,
+    isNew: row.is_new ?? false,
     notes: row.notes ?? undefined,
     starred: row.starred ?? false,
     archived: row.archived ?? false,
