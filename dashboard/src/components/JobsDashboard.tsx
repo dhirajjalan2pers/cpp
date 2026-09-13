@@ -19,8 +19,10 @@ function deadlineCell(iso: string | null) {
   const ms = Date.parse(iso);
   if (Number.isNaN(ms)) return <span className="muted">—</span>;
   const days = Math.ceil((ms - Date.now()) / 86400000);
-  if (days >= 0 && days <= 7) return <span className="dl-soon">{days === 0 ? "today" : `${days} day${days === 1 ? "" : "s"}`}</span>;
-  return <span>{new Date(ms).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>;
+  const date = new Date(ms).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  if (days < 0) return <span className="muted" title={date}>Closed</span>;
+  const label = days === 0 ? "Today" : `${days} day${days === 1 ? "" : "s"} left`;
+  return <span className={days <= 7 ? "dl-soon" : undefined} title={date}>{label}</span>;
 }
 function since(iso: string | null): string {
   if (!iso) return "";
