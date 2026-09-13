@@ -45,7 +45,8 @@ export default function JobsDashboard() {
   const [refreshing, setRefreshing] = useState(false); const [message, setMessage] = useState("");
   const [search, setSearch] = useState(""); const [contract, setContract] = useState(""); const [method, setMethod] = useState(""); const [location, setLocation] = useState("");
   const [hidePermanent, setHidePermanent] = useState(false); const [showArchived, setShowArchived] = useState(false);
-  const [starredOnly, setStarredOnly] = useState(false); const [showApplied, setShowApplied] = useState(false); const [showUnpaid, setShowUnpaid] = useState(true);
+  const [starredOnly, setStarredOnly] = useState(false); const [showApplied, setShowApplied] = useState(false); const [showUnpaid, setShowUnpaid] = useState(false);
+  const [elig, setElig] = useState(""); const [workAuth, setWorkAuth] = useState(false);
   const [triage, setTriage] = useState(true); const [sort, setSort] = useState<{ k: SortKey; d: 1 | -1 }>({ k: "fit", d: -1 });
   const [editing, setEditing] = useState<Job | "new" | null>(null); const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -107,10 +108,12 @@ export default function JobsDashboard() {
         <select value={contract} onChange={(e) => setContract(e.target.value)}><option value="">All Contract Types</option>{contractOpts.map((v) => <option key={v}>{v}</option>)}</select>
         <select value={method} onChange={(e) => setMethod(e.target.value)}><option value="">All Methods</option>{methodOpts.map((v) => <option key={v}>{v}</option>)}</select>
         <select value={location} onChange={(e) => setLocation(e.target.value)}><option value="">All Locations</option>{locationOpts.map((v) => <option key={v}>{v}</option>)}</select>
+        <select value={elig} onChange={(e) => setElig(e.target.value)} title="Eligibility (verify on the portal)"><option value="">All eligibility</option><option value="verify">Needs verification</option><option value="eligible">Eligible</option></select>
         <button className={`seg ${triage ? "on" : ""}`} onClick={() => sortBy("fit", -1)}>Triage</button>
+        <button className={`seg ${workAuth ? "on plain" : ""}`} onClick={() => setWorkAuth((v) => !v)}>Work authorization</button>
         <button className={`seg ${showApplied ? "on plain" : ""}`} onClick={() => setShowApplied((v) => !v)}>Show Applied</button>
         <button className={`seg ${hidePermanent ? "on plain" : ""}`} onClick={() => setHidePermanent((v) => !v)}>Hide Permanent Roles</button>
-        <button className={`seg ${!showUnpaid ? "on plain" : ""}`} onClick={() => setShowUnpaid((v) => !v)}>{showUnpaid ? "Hide Unpaid" : "Unpaid hidden"}</button>
+        <button className={`seg ${showUnpaid ? "on plain" : ""}`} onClick={() => setShowUnpaid((v) => !v)}>Show Unpaid</button>
         <button className={`seg ${starredOnly ? "on plain" : ""}`} onClick={() => setStarredOnly((v) => !v)}>★ Only</button>
         <button className={`seg ${showArchived ? "on plain" : ""}`} onClick={() => setShowArchived((v) => !v)}>Show Archived</button>
         <span className="count-note">Showing {filtered.length} of {activeCount} active jobs</span>
