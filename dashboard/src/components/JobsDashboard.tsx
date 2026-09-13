@@ -61,7 +61,6 @@ export default function JobsDashboard() {
   const [search, setSearch] = useState(""); const [contract, setContract] = useState(""); const [method, setMethod] = useState(""); const [location, setLocation] = useState("");
   const [hidePermanent, setHidePermanent] = useState(false); const [showArchived, setShowArchived] = useState(false);
   const [starredOnly, setStarredOnly] = useState(false); const [showApplied, setShowApplied] = useState(false); const [showUnpaid, setShowUnpaid] = useState(false);
-  const [elig, setElig] = useState(""); const [workAuth, setWorkAuth] = useState(false);
   const [triage, setTriage] = useState(true); const [sort, setSort] = useState<{ k: SortKey; d: 1 | -1 }>({ k: "fit", d: -1 });
   const [editing, setEditing] = useState<Job | "new" | null>(null); const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -72,10 +71,10 @@ export default function JobsDashboard() {
   async function remove(job: Job) { if (!confirm("Delete this manual job?")) return; await fetch(`/api/jobs/manual/${job.id}`, { method: "DELETE" }); await load(); }
 
   const uniq = (arr: string[]) => [...new Set(arr.filter(Boolean))].sort();
-  const contractOpts = useMemo(() => uniq(jobs.map((j) => j.contractType)), [jobs]);
-  const methodOpts = useMemo(() => uniq(jobs.flatMap((j) => j.applicationMethod.split(", "))), [jobs]);
-  const locationOpts = useMemo(() => uniq(jobs.map((j) => j.location)), [jobs]);
   const eligible = useMemo(() => jobs.filter((j) => !isInternshipOnly(j) && !isEuropeOrUSOnly(j.location)), [jobs]);
+  const contractOpts = useMemo(() => uniq(eligible.map((j) => j.contractType)), [eligible]);
+  const methodOpts = useMemo(() => uniq(eligible.flatMap((j) => j.applicationMethod.split(", "))), [eligible]);
+  const locationOpts = useMemo(() => uniq(eligible.map((j) => j.location)), [eligible]);
   const activeCount = useMemo(() => eligible.filter((j) => !j.archived).length, [eligible]);
   const scoredCount = useMemo(() => eligible.filter((j) => j.fitScore !== null).length, [eligible]);
 
@@ -124,14 +123,12 @@ export default function JobsDashboard() {
         <select value={contract} onChange={(e) => setContract(e.target.value)}><option value="">All Contract Types</option>{contractOpts.map((v) => <option key={v}>{v}</option>)}</select>
         <select value={method} onChange={(e) => setMethod(e.target.value)}><option value="">All Methods</option>{methodOpts.map((v) => <option key={v}>{v}</option>)}</select>
         <select value={location} onChange={(e) => setLocation(e.target.value)}><option value="">All Locations</option>{locationOpts.map((v) => <option key={v}>{v}</option>)}</select>
-        <select value={elig} onChange={(e) => setElig(e.target.value)} title="Eligibility (verify on the portal)"><option value="">All eligibility</option><option value="verify">Needs verification</option><option value="eligible">Eligible</option></select>
         <button className={`seg ${triage ? "on" : ""}`} onClick={() => sortBy("fit", -1)}>Triage</button>
-        <button className={`seg ${workAuth ? "on plain" : ""}`} onClick={() => setWorkAuth((v) => !v)}>Work authorization</button>
-        <button className={`seg ${showApplied ? "on plain" : ""}`} onClick={() => setShowApplied((v) => !v)}>Show Applied</button>
-        <button className={`seg ${hidePermanent ? "on plain" : ""}`} onClick={() => setHidePermanent((v) => !v)}>Hide Permanent Roles</button>
-        <button className={`seg ${showUnpaid ? "on plain" : ""}`} onClick={() => setShowUnpaid((v) => !v)}>Show Unpaid</button>
-        <button className={`seg ${starredOnly ? "on plain" : ""}`} onClick={() => setStarredOnly((v) => !v)}>★ Only</button>
-        <button className={`seg ${showArchived ? "on plain" : ""}`} onClick={() => setShowArchived((v) => !v)}>Show Archived</button>
+        <button className={`seg ${showApplied ? "on" : ""}`} onClick={() => setShowApplied((v) => !v)}>Show Applied</button>
+        <button className={`seg ${hidePermanent ? "on" : ""}`} onClick={() => setHidePermanent((v) => !v)}>Hide Permanent Roles</button>
+        <button className={`seg ${showUnpaid ? "on" : ""}`} onClick={() => setShowUnpaid((v) => !v)}>Show Unpaid</button>
+        <button className={`seg ${starredOnly ? "on" : ""}`} onClick={() => setStarredOnly((v) => !v)}>★ Only</button>
+        <button className={`seg ${showArchived ? "on" : ""}`} onClick={() => setShowArchived((v) => !v)}>Show Archived</button>
         <span className="count-note">Showing {filtered.length} of {activeCount} active jobs</span>
       </div>
 
@@ -139,7 +136,6 @@ export default function JobsDashboard() {
         <thead><tr>
           <th className="col-star" />
           <th className={sort.k === "fit" ? "sorted" : ""} onClick={() => sortBy("fit", -1)}>Fit{scoredCount ? <span className="src" style={{ marginLeft: 4 }}>{scoredCount}</span> : null}<span className="ar">{arrow("fit") || " ↕"}</span></th>
-          <th>Eligibility</th>
           {th("applied", "Applied", -1)}
           {th("title", "Title")}
           {th("company", "Company")}
@@ -153,11 +149,11 @@ export default function JobsDashboard() {
           const key = `${job.source}:${job.id}`; const open = expanded === key;
           const methods = job.applicationMethod.split(", ").filter(Boolean);
           const tier = job.fitScore == null ? "none" : job.fitScore >= 75 ? "hi" : job.fitScore >= 60 ? "mid" : "lo";
+          const shade = job.fitScore != null && job.fitScore >= 70;
           return <Fragment key={key}>
-            <tr className={tier === "hi" ? "top-match" : ""} onClick={() => setExpanded(open ? null : key)} style={{ cursor: "pointer" }}>
+            <tr className={shade ? "hi" : ""} onClick={() => setExpanded(open ? null : key)} style={{ cursor: "pointer" }}>
               <td className="col-star" onClick={(e) => { e.stopPropagation(); void setState(job, "starred"); }}><span className={`star ${job.starred ? "on" : ""}`}>{job.starred ? "★" : "☆"}</span></td>
               <td><span className={`fit ${tier}`}>{job.fitScore == null ? "—" : (job.fitScore / 10).toFixed(1)}{job.fitStale && <span className="stale" title="Score stale" />}</span></td>
-              <td><span className="elig verify">? Verify</span></td>
               <td>{job.applied ? <span style={{ color: "var(--success)", fontWeight: 600 }}>Yes</span> : <span className="muted">No</span>}</td>
               <td className="t-title">{job.url ? <a href={job.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{job.title}</a> : <span className="mock">{job.title}</span>}{job.source === "manual" && <span className="src">MANUAL</span>}{!job.active && <span className="src">INACTIVE</span>}</td>
               <td className="t-co">{job.companyName}</td>
@@ -167,11 +163,11 @@ export default function JobsDashboard() {
               <td>{deadlineCell(job.deadline)}</td>
               <td className="muted">{relPosted(job.postedAt)}</td>
             </tr>
-            {open && <tr className="expand-row"><td colSpan={11}><div className="expand">
-              {job.description && <div><h4>Job description</h4><div className="desc">{job.description}</div></div>}
+            {open && <tr className="expand-row"><td colSpan={10}><div className="expand">
+              {job.description && <div className="sticky desc"><h4>Job description</h4><div className="body">{job.description}</div></div>}
               {job.fitAnalysis && <div className="cols2">
-                <div><h4>Strengths</h4><div className="desc">{job.fitAnalysis.strengths.join(" · ") || "—"}</div></div>
-                <div><h4>Gaps</h4><div className="desc">{job.fitAnalysis.gaps.join(" · ") || "—"}</div></div>
+                <div className="sticky st-teal"><h4>Strengths</h4><div className="body">{job.fitAnalysis.strengths.join(" · ") || "—"}</div></div>
+                <div className="sticky st-coral"><h4>Gaps</h4><div className="body">{job.fitAnalysis.gaps.join(" · ") || "—"}</div></div>
               </div>}
               <div className="row-actions">
                 <button className={job.applied ? "success" : "button"} onClick={(e) => { e.stopPropagation(); void setState(job, "applied"); }}>{job.applied ? "Applied ✓" : "Mark applied"}</button>
