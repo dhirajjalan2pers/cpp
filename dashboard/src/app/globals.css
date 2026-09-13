@@ -69,35 +69,38 @@ button,a{transition:.15s ease}a{color:inherit}
 
 /* ---------- table ---------- */
 .tbl-wrap{overflow-x:auto;border-top:1px solid var(--hairline-soft)}
-.tbl{width:100%;border-collapse:collapse;font-size:14px;min-width:980px}
-.tbl thead th{position:sticky;top:0;background:var(--canvas);text-align:left;font-size:11px;font-weight:600;color:var(--stone);
-  letter-spacing:.06em;text-transform:uppercase;padding:13px 16px;border-bottom:1px solid var(--hairline-soft);white-space:nowrap;cursor:pointer;user-select:none}
+.tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:860px}
+.tbl thead th{position:sticky;top:0;background:var(--canvas);text-align:left;font-size:10px;font-weight:600;color:var(--stone);
+  letter-spacing:.05em;text-transform:uppercase;padding:10px 13px;border-bottom:1px solid var(--hairline-soft);white-space:nowrap;cursor:pointer;user-select:none}
 .tbl thead th .ar{color:var(--stone);opacity:.6;margin-left:3px}
 .tbl thead th.sorted{color:var(--ink-deep)}
-.tbl tbody td{padding:17px 16px;border-bottom:1px solid var(--hairline-soft);vertical-align:middle;white-space:nowrap}
+.tbl tbody td{padding:13px 13px;border-bottom:1px solid var(--hairline-soft);vertical-align:middle;white-space:nowrap}
 .tbl tbody tr.hi td{background:var(--hi-row)}
 .tbl tbody tr:hover td{background:#eef4f1}
-.col-star{width:48px;text-align:center}
-.star{border:0;background:none;font-size:18px;color:var(--hairline-strong);cursor:pointer;line-height:1;padding:6px}
+.col-star{width:42px;text-align:center}
+.star{border:0;background:none;font-size:16px;color:var(--hairline-strong);cursor:pointer;line-height:1;padding:5px}
 .star.on{color:var(--yellow)}
-.t-title a,.t-title span.mock{color:var(--blue);font-weight:600;font-size:14.5px;text-decoration:none;cursor:pointer}
+.t-title a,.t-title span.mock{color:var(--blue);font-weight:600;font-size:13.5px;text-decoration:none;cursor:pointer}
 .t-title a:hover{text-decoration:underline}
 .t-title span.mock{color:var(--ink-deep)}
-.t-title{max-width:280px;overflow:hidden;text-overflow:ellipsis}
-.t-co{max-width:170px;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
-.t-loc{max-width:160px;overflow:hidden;text-overflow:ellipsis;color:var(--slate)}
+.t-title{max-width:240px;overflow:hidden;text-overflow:ellipsis}
+.t-co{max-width:150px;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
+.t-loc{max-width:140px;overflow:hidden;text-overflow:ellipsis;color:var(--slate)}
+.new-badge{display:inline-block;font-size:9px;font-weight:800;letter-spacing:.06em;color:var(--ink-deep);background:var(--yellow);border-radius:5px;padding:2px 6px;margin-right:7px;vertical-align:middle}
 .muted{color:var(--slate)}
 .dl-soon{color:var(--coral-dark);font-weight:700}
-/* expanded row → pastel sticky cards */
-.expand-row td{padding:0;background:var(--surface)}
-.expand{padding:8px 24px 24px;display:grid;gap:14px}
-.sticky{border-radius:16px;padding:16px 18px}
-.expand h4{margin:0 0 6px;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--slate);font-weight:700}
-.expand .desc{background:var(--canvas);border:1px solid var(--hairline)}
-.expand .desc p,.expand .desc .body{margin:0;font-size:13.5px;line-height:1.55;color:var(--ink);white-space:pre-line;max-height:240px;overflow:auto}
+/* expanded row → colored Miro sticky cards on a soft gradient spotlight */
+.expand-row td{padding:0}
+.expand{padding:14px 20px 22px;display:grid;gap:14px;
+  background:radial-gradient(520px 180px at 88% 0%,rgba(106,76,245,.12),transparent 70%),radial-gradient(460px 200px at 6% 100%,rgba(255,122,61,.10),transparent 70%),var(--surface)}
+.sticky{border-radius:16px;padding:15px 17px}
+.expand h4{margin:0 0 6px;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:700;opacity:.75}
+.sticky .body{margin:0;font-size:13px;line-height:1.55;white-space:pre-line;max-height:220px;overflow:auto}
 .expand .cols2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.st-teal{background:var(--teal-light)}.st-teal h4{color:var(--teal)}.st-teal .body{color:var(--teal);font-size:13.5px;line-height:1.55}
-.st-coral{background:var(--coral-soft)}.st-coral h4{color:var(--coral-dark)}.st-coral .body{color:var(--coral-dark);font-size:13.5px;line-height:1.55}
+.st-yellow{background:var(--yellow-light);color:var(--yellow-dark)}
+.st-teal{background:var(--teal-light);color:var(--teal)}
+.st-coral{background:var(--coral-soft);color:var(--coral-dark)}
+.st-rose{background:#fde0f0;color:#7a2352}
 .row-actions{display:flex;gap:10px;flex-wrap:wrap}
 .row-actions .button,.row-actions .success,.row-actions .danger{padding:8px 14px;font-size:13px}
 

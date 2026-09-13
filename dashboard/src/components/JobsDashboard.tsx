@@ -1,29 +1,12 @@
 "use client";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import type { Job } from "@/lib/types";
+import { isReachable } from "@/lib/eligibility";
 import AppHeader from "./AppHeader";
 import ManualJobForm from "./ManualJobForm";
 
 interface Session { hasSession: boolean; expiresAt: string | null; updatedAt: string | null; expired: boolean }
 type SortKey = "fit" | "title" | "company" | "contract" | "method" | "location" | "deadline" | "posted" | "applied";
-
-// --- hard eligibility filters (permanent, per owner's constraints) ---
-const US_STATES = new Set("AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC".split(" "));
-const EU_COUNTRIES = new Set(["ireland", "france", "germany", "spain", "italy", "netherlands", "belgium", "denmark", "sweden", "norway", "finland", "portugal", "austria", "poland", "switzerland", "greece", "czech republic", "czechia", "hungary", "romania", "luxembourg", "iceland"]);
-function isInternshipOnly(job: Job): boolean {
-  const types = job.contractType.split(",").map((s) => s.trim()).filter(Boolean);
-  return types.length > 0 && types.every((t) => /internship/i.test(t));
-}
-function isEuropeOrUSOnly(loc: string): boolean {
-  if (!loc) return false;
-  const l = loc.toLowerCase();
-  if (/remote|multiple|flexible|negotiable|not specified/.test(l)) return false; // keep
-  if (l.includes("united kingdom") || l.includes("london")) return false;         // keep UK
-  const segs = loc.split(/[-,]/).map((s) => s.trim()).filter(Boolean);
-  const last = segs[segs.length - 1] || "";
-  if (US_STATES.has(last.toUpperCase()) || l.includes("united states") || /\busa\b/.test(l)) return true;
-  return EU_COUNTRIES.has(last.toLowerCase());
-}
 
 function relPosted(iso: string | null): string {
   if (!iso) return "—";
@@ -59,19 +42,50 @@ export default function JobsDashboard() {
   const [jobs, setJobs] = useState<Job[]>([]); const [session, setSession] = useState<Session | null>(null); const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false); const [message, setMessage] = useState("");
   const [search, setSearch] = useState(""); const [contract, setContract] = useState(""); const [method, setMethod] = useState(""); const [location, setLocation] = useState("");
-  const [hidePermanent, setHidePermanent] = useState(false); const [showArchived, setShowArchived] = useState(false);
-  const [starredOnly, setStarredOnly] = useState(false); const [showApplied, setShowApplied] = useState(false); const [showUnpaid, setShowUnpaid] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [starredOnly, setStarredOnly] = useState(false); const [showApplied, setShowApplied] = useState(false);
+  const [newIds, setNewIds] = useState<Set<string>>(new Set());
   const [triage, setTriage] = useState(true); const [sort, setSort] = useState<{ k: SortKey; d: 1 | -1 }>({ k: "fit", d: -1 });
   const [editing, setEditing] = useState<Job | "new" | null>(null); const [expanded, setExpanded] = useState<string | null>(null);
 
-  const load = useCallback(async () => { setLoading(true); const r = await fetch("/api/cpp/jobs", { cache: "no-store" }); const b = await r.json(); if (r.ok) { setJobs(b.jobs); setSession(b.session); } else setMessage(b.error); setLoading(false); }, []);
+  const load = useCallback(async (): Promise<Job[]> => {
+    setLoading(true);
+    const r = await fetch("/api/cpp/jobs", { cache: "no-store" });
+    const b = await r.json();
+    if (r.ok) {
+      setJobs(b.jobs); setSession(b.session);
+      try {
+        const ids = (b.jobs as Job[]).map((j) => `${j.source}:${j.id}`);
+        if (localStorage.getItem("ujb_seen_ids") === null) localStorage.setItem("ujb_seen_ids", JSON.stringify(ids));
+        const rawNew = localStorage.getItem("ujb_new_ids");
+        if (rawNew) { const s = new Set<string>(JSON.parse(rawNew)); setNewIds(new Set(ids.filter((id) => s.has(id)))); }
+      } catch { /* storage unavailable */ }
+    } else setMessage(b.error);
+    setLoading(false);
+    return r.ok ? (b.jobs as Job[]) : [];
+  }, []);
   useEffect(() => { void load(); }, [load]);
-  async function refresh() { setRefreshing(true); setMessage(""); const r = await fetch("/api/cpp/jobs/refresh", { method: "POST" }); const b = await r.json(); setMessage(r.ok ? `Refreshed ${b.refreshed} active CPP jobs.` : b.error); if (r.ok) await load(); setRefreshing(false); }
+  async function refresh() {
+    setRefreshing(true); setMessage("");
+    let prevSeen = new Set<string>();
+    try { const raw = localStorage.getItem("ujb_seen_ids"); if (raw) prevSeen = new Set(JSON.parse(raw)); } catch { /* ignore */ }
+    const r = await fetch("/api/cpp/jobs/refresh", { method: "POST" });
+    const b = await r.json();
+    if (r.ok) {
+      const list = await load();
+      const ids = list.map((j) => `${j.source}:${j.id}`);
+      const fresh = ids.filter((id) => !prevSeen.has(id));
+      setNewIds(new Set(fresh));
+      try { localStorage.setItem("ujb_new_ids", JSON.stringify(fresh)); localStorage.setItem("ujb_seen_ids", JSON.stringify(ids)); } catch { /* ignore */ }
+      setMessage(`Refreshed ${b.refreshed} active CPP jobs${fresh.length ? ` · ${fresh.length} new` : ""}.`);
+    } else setMessage(b.error);
+    setRefreshing(false);
+  }
   async function setState(job: Job, field: "starred" | "archived" | "applied") { await fetch("/api/jobs/state", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jobSource: job.source, jobId: job.id, [field]: !job[field] }) }); await load(); }
   async function remove(job: Job) { if (!confirm("Delete this manual job?")) return; await fetch(`/api/jobs/manual/${job.id}`, { method: "DELETE" }); await load(); }
 
   const uniq = (arr: string[]) => [...new Set(arr.filter(Boolean))].sort();
-  const eligible = useMemo(() => jobs.filter((j) => !isInternshipOnly(j) && !isEuropeOrUSOnly(j.location)), [jobs]);
+  const eligible = useMemo(() => jobs.filter((j) => isReachable(j)), [jobs]);
   const contractOpts = useMemo(() => uniq(eligible.map((j) => j.contractType)), [eligible]);
   const methodOpts = useMemo(() => uniq(eligible.flatMap((j) => j.applicationMethod.split(", "))), [eligible]);
   const locationOpts = useMemo(() => uniq(eligible.map((j) => j.location)), [eligible]);
@@ -82,9 +96,8 @@ export default function JobsDashboard() {
     const hay = `${job.title} ${job.companyName} ${job.location} ${job.industry} ${job.description}`.toLowerCase();
     return (!search || hay.includes(search.toLowerCase())) && (!contract || job.contractType === contract)
       && (!method || job.applicationMethod.includes(method)) && (!location || job.location === location)
-      && (!hidePermanent || !job.contractType.toLowerCase().includes("permanent"))
       && (showArchived ? job.archived : !job.archived) && (!starredOnly || job.starred)
-      && (!showApplied || job.applied) && (showUnpaid || job.isPaid !== false);
+      && (!showApplied || job.applied);
   }).sort((a, b) => {
     const k = sort.k, d = sort.d;
     const cmp = k === "fit" ? (a.fitScore ?? -1) - (b.fitScore ?? -1)
@@ -94,7 +107,7 @@ export default function JobsDashboard() {
       : k === "posted" ? Date.parse(a.postedAt ?? "0") - Date.parse(b.postedAt ?? "0")
       : Date.parse(a.deadline ?? "9999-12-31") - Date.parse(b.deadline ?? "9999-12-31");
     return cmp * d;
-  }), [eligible, search, contract, method, location, hidePermanent, showArchived, starredOnly, showApplied, showUnpaid, sort]);
+  }), [eligible, search, contract, method, location, showArchived, starredOnly, showApplied, sort]);
 
   function sortBy(k: SortKey, defaultDir: 1 | -1 = 1) { setTriage(k === "fit"); setSort((s) => s.k === k ? { k, d: (s.d === 1 ? -1 : 1) } : { k, d: defaultDir }); }
   const arrow = (k: SortKey) => sort.k === k ? (sort.d === 1 ? " ↑" : " ↓") : "";
@@ -125,8 +138,6 @@ export default function JobsDashboard() {
         <select value={location} onChange={(e) => setLocation(e.target.value)}><option value="">All Locations</option>{locationOpts.map((v) => <option key={v}>{v}</option>)}</select>
         <button className={`seg ${triage ? "on" : ""}`} onClick={() => sortBy("fit", -1)}>Triage</button>
         <button className={`seg ${showApplied ? "on" : ""}`} onClick={() => setShowApplied((v) => !v)}>Show Applied</button>
-        <button className={`seg ${hidePermanent ? "on" : ""}`} onClick={() => setHidePermanent((v) => !v)}>Hide Permanent Roles</button>
-        <button className={`seg ${showUnpaid ? "on" : ""}`} onClick={() => setShowUnpaid((v) => !v)}>Show Unpaid</button>
         <button className={`seg ${starredOnly ? "on" : ""}`} onClick={() => setStarredOnly((v) => !v)}>★ Only</button>
         <button className={`seg ${showArchived ? "on" : ""}`} onClick={() => setShowArchived((v) => !v)}>Show Archived</button>
         <span className="count-note">Showing {filtered.length} of {activeCount} active jobs</span>
@@ -155,7 +166,7 @@ export default function JobsDashboard() {
               <td className="col-star" onClick={(e) => { e.stopPropagation(); void setState(job, "starred"); }}><span className={`star ${job.starred ? "on" : ""}`}>{job.starred ? "★" : "☆"}</span></td>
               <td><span className={`fit ${tier}`}>{job.fitScore == null ? "—" : (job.fitScore / 10).toFixed(1)}{job.fitStale && <span className="stale" title="Score stale" />}</span></td>
               <td>{job.applied ? <span style={{ color: "var(--success)", fontWeight: 600 }}>Yes</span> : <span className="muted">No</span>}</td>
-              <td className="t-title">{job.url ? <a href={job.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{job.title}</a> : <span className="mock">{job.title}</span>}{job.source === "manual" && <span className="src">MANUAL</span>}{!job.active && <span className="src">INACTIVE</span>}</td>
+              <td className="t-title">{newIds.has(key) && <span className="new-badge">NEW</span>}{job.url ? <a href={job.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{job.title}</a> : <span className="mock">{job.title}</span>}{job.source === "manual" && <span className="src">MANUAL</span>}{!job.active && <span className="src">INACTIVE</span>}</td>
               <td className="t-co">{job.companyName}</td>
               <td>{job.industry ? <span className="pill">{job.industry}</span> : <span className="muted">—</span>}</td>
               <td>{methods.length ? methods.map((m) => m.toUpperCase() === "CPP" ? <span key={m} className="pill">CPP</span> : <span key={m} className="muted">{m}</span>) : <span className="muted">—</span>}</td>
@@ -164,11 +175,12 @@ export default function JobsDashboard() {
               <td className="muted">{relPosted(job.postedAt)}</td>
             </tr>
             {open && <tr className="expand-row"><td colSpan={10}><div className="expand">
-              {job.description && <div className="sticky desc"><h4>Job description</h4><div className="body">{job.description}</div></div>}
+              {job.description && <div className="sticky st-yellow"><h4>Job description</h4><div className="body">{job.description}</div></div>}
               {job.fitAnalysis && <div className="cols2">
                 <div className="sticky st-teal"><h4>Strengths</h4><div className="body">{job.fitAnalysis.strengths.join(" · ") || "—"}</div></div>
                 <div className="sticky st-coral"><h4>Gaps</h4><div className="body">{job.fitAnalysis.gaps.join(" · ") || "—"}</div></div>
               </div>}
+              {job.fitAnalysis && job.fitAnalysis.resumeRecommendations.length > 0 && <div className="sticky st-rose"><h4>Résumé tweaks</h4><div className="body">{job.fitAnalysis.resumeRecommendations.map((r) => `${r.section}: ${r.after}`).join(" · ")}</div></div>}
               <div className="row-actions">
                 <button className={job.applied ? "success" : "button"} onClick={(e) => { e.stopPropagation(); void setState(job, "applied"); }}>{job.applied ? "Applied ✓" : "Mark applied"}</button>
                 <button className="button" onClick={(e) => { e.stopPropagation(); void setState(job, "archived"); }}>{job.archived ? "Restore" : "Archive"}</button>

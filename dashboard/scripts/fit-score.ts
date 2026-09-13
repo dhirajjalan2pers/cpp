@@ -4,10 +4,11 @@ import { readFile, writeFile } from "node:fs/promises";
 import { decrypt, sha256 } from "../src/lib/crypto";
 import { closePool, query, transaction } from "../src/lib/db";
 import { listJobs } from "../src/lib/jobs";
+import { isReachable } from "../src/lib/eligibility";
 import { scoreImportSchema } from "../src/lib/validation";
 
 function usage(): never {
-  console.error("Usage: npm run fit -- list-jobs --with-jd [--unscored|--stale]\n       npm run fit -- export-resume --out <path>\n       npm run fit -- import-scores <json-file>");
+  console.error("Usage: npm run fit -- list-jobs --with-jd [--unscored|--stale] [--reachable]\n       npm run fit -- export-resume --out <path>\n       npm run fit -- import-scores <json-file>");
   process.exit(2);
 }
 
@@ -17,6 +18,7 @@ async function list() {
   let jobs = await listJobs();
   if (args.has("--unscored")) jobs = jobs.filter((job) => job.fitScore === null);
   if (args.has("--stale")) jobs = jobs.filter((job) => job.fitStale);
+  if (args.has("--reachable")) jobs = jobs.filter((job) => isReachable(job)); // skip internships + Europe/USA-only
   console.log(JSON.stringify({ jobs: jobs.filter((job) => !job.archived).map((job) => ({
     jobId: job.id, jobSource: job.source, jobTitle: job.title, companyName: job.companyName,
     description: job.description, currentScore: job.fitScore, stale: job.fitStale,
