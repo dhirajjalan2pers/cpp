@@ -8,11 +8,23 @@ import ManualJobForm from "./ManualJobForm";
 interface Session { hasSession: boolean; expiresAt: string | null; updatedAt: string | null; expired: boolean }
 type SortKey = "fit" | "title" | "company" | "contract" | "method" | "location" | "deadline" | "posted" | "applied";
 
+const IND_COLORS = ["ind-yellow", "ind-teal", "ind-coral", "ind-rose", "ind-blue", "ind-violet", "ind-orange", "ind-mint"];
+function indColor(s: string): string {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return IND_COLORS[h % IND_COLORS.length];
+}
+
 function relPosted(iso: string | null): string {
   if (!iso) return "—";
   const days = Math.floor((Date.now() - Date.parse(iso)) / 86400000);
   if (Number.isNaN(days)) return "—";
   return days <= 0 ? "today" : `${days}d ago`;
+}
+function fmtDate(iso: string | null): string {
+  if (!iso) return "—";
+  const ms = Date.parse(iso);
+  return Number.isNaN(ms) ? "—" : new Date(ms).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 function deadlineCell(iso: string | null) {
   if (!iso) return <span className="muted">—</span>;
@@ -156,13 +168,31 @@ export default function JobsDashboard() {
               <td>{job.applied ? <span style={{ color: "var(--success)", fontWeight: 600 }}>Yes</span> : <span className="muted">No</span>}</td>
               <td className="t-title">{job.isNew && <span className="new-badge">NEW</span>}{job.url ? <a href={job.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{job.title}</a> : <span className="mock">{job.title}</span>}{job.source === "manual" && <span className="src">MANUAL</span>}{!job.active && <span className="src">INACTIVE</span>}</td>
               <td className="t-co">{job.companyName}</td>
-              <td>{job.industry ? <span className="pill">{job.industry}</span> : <span className="muted">—</span>}</td>
+              <td>{(() => { const parts = job.industry.split(",").map((s) => s.trim()).filter(Boolean); if (!parts.length) return <span className="muted">—</span>; return <><span className={`pill ${indColor(parts[0])}`}>{parts[0]}</span>{parts.length > 1 && <span className="pill more" title={parts.slice(1).join(", ")}>+{parts.length - 1}</span>}</>; })()}</td>
               <td>{methods.length ? methods.map((m) => m.toUpperCase() === "CPP" ? <span key={m} className="pill">CPP</span> : <span key={m} className="muted">{m}</span>) : <span className="muted">—</span>}</td>
               <td className="t-loc">{job.location || <span className="muted">Not specified</span>}</td>
               <td>{deadlineCell(job.deadline)}</td>
               <td className="muted">{relPosted(job.postedAt)}</td>
             </tr>
             {open && <tr className="expand-row"><td colSpan={10}><div className="expand">
+              <div className="sticky st-blue details">
+                <h4>Career Portal details</h4>
+                <div className="kv">
+                  <div><span>Contract</span><b>{job.contractType || "—"}</b></div>
+                  <div><span>Apply via</span><b>{job.applicationMethod || "—"}</b></div>
+                  <div><span>Paid</span><b>{job.isPaid === true ? "Yes" : job.isPaid === false ? "No" : "—"}</b></div>
+                  <div><span>Applicants</span><b>{job.applicantCount}</b></div>
+                  <div><span>Applied</span><b>{job.applied ? "Yes" : "No"}</b></div>
+                  <div><span>Posted</span><b>{fmtDate(job.postedAt)}</b></div>
+                  <div><span>Deadline</span><b>{fmtDate(job.deadline)}</b></div>
+                  <div><span>Location</span><b>{job.location || "—"}</b></div>
+                  <div><span>Industry</span><b>{job.industry || "—"}</b></div>
+                  <div><span>Source</span><b>{job.source === "cpp" ? "CPP (12twenty)" : "Manual"}</b></div>
+                  <div><span>Status</span><b>{job.active ? "Active" : "Inactive"}{job.isNew ? " · New" : ""}</b></div>
+                  <div><span>Fit score</span><b>{job.fitScore == null ? "Not scored" : `${(job.fitScore / 10).toFixed(1)} / 10${job.fitStale ? " (stale)" : ""}`}</b></div>
+                </div>
+                {job.url && <a className="button" href={job.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>Open on 12twenty ↗</a>}
+              </div>
               {job.description && <div className="sticky st-yellow"><h4>Job description</h4><div className="body">{job.description}</div></div>}
               {job.fitAnalysis && <div className="cols2">
                 <div className="sticky st-teal"><h4>Strengths</h4><div className="body">{job.fitAnalysis.strengths.join(" · ") || "—"}</div></div>
