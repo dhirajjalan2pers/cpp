@@ -7,8 +7,23 @@ import ManualJobForm from "./ManualJobForm";
 interface Session { hasSession: boolean; expiresAt: string | null; updatedAt: string | null; expired: boolean }
 type SortKey = "fit" | "title" | "company" | "contract" | "method" | "location" | "deadline" | "posted" | "applied";
 
-const PILL = ["p-blue", "p-green", "p-purple", "p-amber", "p-slate"];
-const pc = (s: string) => PILL[[...(s || "")].reduce((a, c) => a + c.charCodeAt(0), 0) % PILL.length];
+// --- hard eligibility filters (permanent, per owner's constraints) ---
+const US_STATES = new Set("AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC".split(" "));
+const EU_COUNTRIES = new Set(["ireland", "france", "germany", "spain", "italy", "netherlands", "belgium", "denmark", "sweden", "norway", "finland", "portugal", "austria", "poland", "switzerland", "greece", "czech republic", "czechia", "hungary", "romania", "luxembourg", "iceland"]);
+function isInternshipOnly(job: Job): boolean {
+  const types = job.contractType.split(",").map((s) => s.trim()).filter(Boolean);
+  return types.length > 0 && types.every((t) => /internship/i.test(t));
+}
+function isEuropeOrUSOnly(loc: string): boolean {
+  if (!loc) return false;
+  const l = loc.toLowerCase();
+  if (/remote|multiple|flexible|negotiable|not specified/.test(l)) return false; // keep
+  if (l.includes("united kingdom") || l.includes("london")) return false;         // keep UK
+  const segs = loc.split(/[-,]/).map((s) => s.trim()).filter(Boolean);
+  const last = segs[segs.length - 1] || "";
+  if (US_STATES.has(last.toUpperCase()) || l.includes("united states") || /\busa\b/.test(l)) return true;
+  return EU_COUNTRIES.has(last.toLowerCase());
+}
 
 function relPosted(iso: string | null): string {
   if (!iso) return "—";
@@ -60,10 +75,11 @@ export default function JobsDashboard() {
   const contractOpts = useMemo(() => uniq(jobs.map((j) => j.contractType)), [jobs]);
   const methodOpts = useMemo(() => uniq(jobs.flatMap((j) => j.applicationMethod.split(", "))), [jobs]);
   const locationOpts = useMemo(() => uniq(jobs.map((j) => j.location)), [jobs]);
-  const activeCount = useMemo(() => jobs.filter((j) => !j.archived).length, [jobs]);
-  const scoredCount = useMemo(() => jobs.filter((j) => j.fitScore !== null).length, [jobs]);
+  const eligible = useMemo(() => jobs.filter((j) => !isInternshipOnly(j) && !isEuropeOrUSOnly(j.location)), [jobs]);
+  const activeCount = useMemo(() => eligible.filter((j) => !j.archived).length, [eligible]);
+  const scoredCount = useMemo(() => eligible.filter((j) => j.fitScore !== null).length, [eligible]);
 
-  const filtered = useMemo(() => jobs.filter((job) => {
+  const filtered = useMemo(() => eligible.filter((job) => {
     const hay = `${job.title} ${job.companyName} ${job.location} ${job.industry} ${job.description}`.toLowerCase();
     return (!search || hay.includes(search.toLowerCase())) && (!contract || job.contractType === contract)
       && (!method || job.applicationMethod.includes(method)) && (!location || job.location === location)
@@ -79,7 +95,7 @@ export default function JobsDashboard() {
       : k === "posted" ? Date.parse(a.postedAt ?? "0") - Date.parse(b.postedAt ?? "0")
       : Date.parse(a.deadline ?? "9999-12-31") - Date.parse(b.deadline ?? "9999-12-31");
     return cmp * d;
-  }), [jobs, search, contract, method, location, hidePermanent, showArchived, starredOnly, showApplied, showUnpaid, sort]);
+  }), [eligible, search, contract, method, location, hidePermanent, showArchived, starredOnly, showApplied, showUnpaid, sort]);
 
   function sortBy(k: SortKey, defaultDir: 1 | -1 = 1) { setTriage(k === "fit"); setSort((s) => s.k === k ? { k, d: (s.d === 1 ? -1 : 1) } : { k, d: defaultDir }); }
   const arrow = (k: SortKey) => sort.k === k ? (sort.d === 1 ? " ↑" : " ↓") : "";
@@ -128,8 +144,6 @@ export default function JobsDashboard() {
           {th("title", "Title")}
           {th("company", "Company")}
           <th>Industry</th>
-          {th("contract", "Contract Type")}
-          <th>Docs</th>
           {th("method", "Method")}
           {th("location", "Location")}
           {th("deadline", "Deadline")}
@@ -138,23 +152,22 @@ export default function JobsDashboard() {
         <tbody>{filtered.map((job) => {
           const key = `${job.source}:${job.id}`; const open = expanded === key;
           const methods = job.applicationMethod.split(", ").filter(Boolean);
+          const tier = job.fitScore == null ? "none" : job.fitScore >= 75 ? "hi" : job.fitScore >= 60 ? "mid" : "lo";
           return <Fragment key={key}>
-            <tr className={job.applied ? "applied-row" : ""} onClick={() => setExpanded(open ? null : key)} style={{ cursor: "pointer" }}>
+            <tr className={tier === "hi" ? "top-match" : ""} onClick={() => setExpanded(open ? null : key)} style={{ cursor: "pointer" }}>
               <td className="col-star" onClick={(e) => { e.stopPropagation(); void setState(job, "starred"); }}><span className={`star ${job.starred ? "on" : ""}`}>{job.starred ? "★" : "☆"}</span></td>
-              <td>{job.fitScore === null ? <span className="fit none">—</span> : <span className="fit">{(job.fitScore / 10).toFixed(1)}{job.fitStale && <span className="stale" title="Score stale" />}</span>}</td>
+              <td><span className={`fit ${tier}`}>{job.fitScore == null ? "—" : (job.fitScore / 10).toFixed(1)}{job.fitStale && <span className="stale" title="Score stale" />}</span></td>
               <td><span className="elig verify">? Verify</span></td>
-              <td className="muted">{job.applied ? "Yes" : "No"}</td>
+              <td>{job.applied ? <span style={{ color: "var(--success)", fontWeight: 600 }}>Yes</span> : <span className="muted">No</span>}</td>
               <td className="t-title">{job.url ? <a href={job.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{job.title}</a> : <span className="mock">{job.title}</span>}{job.source === "manual" && <span className="src">MANUAL</span>}{!job.active && <span className="src">INACTIVE</span>}</td>
               <td className="t-co">{job.companyName}</td>
-              <td>{job.industry ? <span className={`pill ${pc(job.industry)}`}>{job.industry}</span> : <span className="muted">—</span>}</td>
-              <td>{job.contractType ? <span className={`pill ${pc(job.contractType)}`}>{job.contractType}</span> : <span className="muted">—</span>}</td>
-              <td><span className="pill p-green">CV</span></td>
-              <td>{methods.length ? methods.map((m) => m.toUpperCase() === "CPP" ? <span key={m} className="pill p-purple">CPP</span> : <span key={m} className="muted">{m}</span>) : <span className="muted">—</span>}</td>
+              <td>{job.industry ? <span className="pill">{job.industry}</span> : <span className="muted">—</span>}</td>
+              <td>{methods.length ? methods.map((m) => m.toUpperCase() === "CPP" ? <span key={m} className="pill">CPP</span> : <span key={m} className="muted">{m}</span>) : <span className="muted">—</span>}</td>
               <td className="t-loc">{job.location || <span className="muted">Not specified</span>}</td>
               <td>{deadlineCell(job.deadline)}</td>
               <td className="muted">{relPosted(job.postedAt)}</td>
             </tr>
-            {open && <tr className="expand-row"><td colSpan={13}><div className="expand">
+            {open && <tr className="expand-row"><td colSpan={11}><div className="expand">
               {job.description && <div><h4>Job description</h4><div className="desc">{job.description}</div></div>}
               {job.fitAnalysis && <div className="cols2">
                 <div><h4>Strengths</h4><div className="desc">{job.fitAnalysis.strengths.join(" · ") || "—"}</div></div>
